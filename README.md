@@ -116,7 +116,7 @@ push / tag / schedule / manual dispatch
 
 | Trigger | Behavior |
 |---------|----------|
-| Push to `main` | Full build + publish as pre-release |
+| Push to `main` | Full build + publish as stable release |
 | Push a `v*` tag | Full build + publish as stable release |
 | Pull request | Build + scan only (no publish) |
 | Weekly schedule | Monday 02:00 UTC — full build + publish |
