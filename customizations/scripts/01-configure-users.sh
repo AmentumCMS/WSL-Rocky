@@ -7,8 +7,6 @@
 # =============================================================================
 set -euo pipefail
 
-export DEBIAN_FRONTEND=noninteractive
-
 log() { echo "[01-configure-users] $*"; }
 
 # ── Create default non-root user (optional) ───────────────────────────────────
@@ -24,7 +22,7 @@ if [ "${CREATE_DEFAULT_USER}" = "true" ]; then
     useradd \
       --create-home \
       --shell  "${DEFAULT_SHELL}" \
-      --groups sudo \
+      --groups wheel \
       "${DEFAULT_USERNAME}"
     # Lock password — user will authenticate via Windows credential
     passwd -l "${DEFAULT_USERNAME}"
@@ -57,13 +55,9 @@ chmod 440 /etc/sudoers.d/99-wsl-hardening
 # ── MOTD configuration ────────────────────────────────────────────────────────
 ORG_NAME="${ORG_NAME:-My Organization}"
 ORG_CONTACT="${ORG_CONTACT:-it-support@example.com}"
-UBUNTU_VERSION="${UBUNTU_VERSION:-22.04}"
+ROCKY_VERSION="${ROCKY_VERSION:-9}"
 
 log "Configuring MOTD..."
-# Disable dynamic MOTD scripts that reveal system info
-if [ -d /etc/update-motd.d ]; then
-  chmod -x /etc/update-motd.d/* 2>/dev/null || true
-fi
 
 # Truncate organization name to fit in the banner (max 47 chars)
 ORG_NAME_TRUNCATED="${ORG_NAME:0:47}"
@@ -72,7 +66,7 @@ cat > /etc/motd << MOTDEOF
 
   ┌─────────────────────────────────────────────────────────────────┐
   │  $(printf '%-63s' "${ORG_NAME_TRUNCATED}")│
-  │  $(printf '%-63s' "Ubuntu ${UBUNTU_VERSION} WSL2 — Hardened Image")│
+  │  $(printf '%-63s' "Rocky Linux ${ROCKY_VERSION} WSL2 — Hardened Image")│
   └─────────────────────────────────────────────────────────────────┘
 
   This system is for authorized use only.

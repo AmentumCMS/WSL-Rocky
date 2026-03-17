@@ -5,7 +5,7 @@
 #   - One package name per line
 #   - Lines beginning with # are comments
 #   - Blank lines are ignored
-#   - Use the exact apt package name (e.g. `apt-cache search <term>`)
+#   - Use the exact dnf package name (e.g. `dnf search <term>`)
 #
 # These packages are installed BEFORE STIG hardening so that hardening rules
 # (e.g., setting file permissions on config files) apply to them.
@@ -29,28 +29,29 @@ tmux
 screen
 
 # ── Networking ────────────────────────────────────────────────────────────────
-iputils-ping
+iputils
 net-tools
-dnsutils
+bind-utils
 nmap
 traceroute
-netcat-openbsd
-iproute2
-openssh-client
+ncat
+iproute
+openssh-clients
 
 # ── Security utilities ────────────────────────────────────────────────────────
 openssl
 gnupg2
-gpg-agent
 fail2ban
-ufw
+firewalld
 aide
 rkhunter
-chkrootkit
 
 # ── Development tools (remove if not needed) ─────────────────────────────────
+# On Rocky Linux, use `dnf groupinstall "Development Tools"` for a full
+# development environment, or install individual packages:
 # git
-# build-essential
+# gcc
+# make
 # python3
 # python3-pip
 # python3-venv

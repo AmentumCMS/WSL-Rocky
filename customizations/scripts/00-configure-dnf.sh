@@ -1,52 +1,47 @@
 #!/usr/bin/env bash
 # =============================================================================
-# customizations/scripts/00-configure-apt.sh
+# customizations/scripts/00-configure-dnf.sh
 #
-# Hook script #00: Configure APT settings for the WSL image.
+# Hook script #00: Configure DNF settings and system basics for the WSL image.
 # Runs inside the container before package installation.
 #
 # Numbering convention:
-#   00-09  — System/APT configuration (runs before package install)
+#   00-09  — System/DNF configuration (runs before package install)
 #   10-49  — Package-related setup
 #   50-79  — User and identity configuration
 #   80-99  — Final configuration and cleanup
 # =============================================================================
 set -euo pipefail
 
-export DEBIAN_FRONTEND=noninteractive
-
-log() { echo "[00-configure-apt] $*"; }
-
-# ── Disable apt-recommends to keep image lean (optional) ─────────────────────
-# Uncomment to install only required dependencies, not recommended packages:
-# cat > /etc/apt/apt.conf.d/01-no-recommends << 'APTEOF'
-# APT::Install-Recommends "false";
-# APT::Install-Suggests "false";
-# APTEOF
-# log "Disabled apt recommends"
+log() { echo "[00-configure-dnf] $*"; }
 
 # ── Configure HTTP proxy (if needed) ─────────────────────────────────────────
-if [ -n "${APT_HTTP_PROXY:-}" ]; then
-  log "Configuring APT proxy: ${APT_HTTP_PROXY}"
-  cat > /etc/apt/apt.conf.d/02-proxy << APTPROXYEOF
-Acquire::http::Proxy "${APT_HTTP_PROXY}";
-Acquire::https::Proxy "${APT_HTTP_PROXY}";
-APTPROXYEOF
+if [ -n "${DNF_HTTP_PROXY:-}" ]; then
+  log "Configuring DNF proxy: ${DNF_HTTP_PROXY}"
+  echo "proxy=${DNF_HTTP_PROXY}" >> /etc/dnf/dnf.conf
 fi
 
 # ── Configure timezone ────────────────────────────────────────────────────────
 TIMEZONE="${TIMEZONE:-UTC}"
 log "Setting timezone to ${TIMEZONE}..."
-apt-get install -y --no-install-recommends tzdata 2>/dev/null || true
+dnf install -y tzdata 2>/dev/null || true
 ln -snf "/usr/share/zoneinfo/${TIMEZONE}" /etc/localtime
 echo "${TIMEZONE}" > /etc/timezone
 
 # ── Configure locale ─────────────────────────────────────────────────────────
 LOCALE="${LOCALE:-en_US.UTF-8}"
+LANG_CODE="${LOCALE%%.*}"     # e.g. en_US
+CHARSET="${LOCALE##*.}"       # e.g. UTF-8
+# Derive the glibc-langpack name: en_US → en, fr_FR → fr, zh_CN → zh
+LANG_PREFIX="${LANG_CODE%%_*}"
 log "Setting locale to ${LOCALE}..."
-apt-get install -y --no-install-recommends locales 2>/dev/null || true
-locale-gen "${LOCALE}"
-update-locale LANG="${LOCALE}" LC_ALL="${LOCALE}"
+dnf install -y "glibc-langpack-${LANG_PREFIX}" 2>/dev/null || \
+  dnf install -y "glibc-all-langpacks" 2>/dev/null || true
+localedef -i "${LANG_CODE}" -f "${CHARSET}" "${LOCALE}" 2>/dev/null || true
+cat > /etc/locale.conf << LOCALEEOF
+LANG=${LOCALE}
+LC_ALL=${LOCALE}
+LOCALEEOF
 
 # ── Configure WSL ─────────────────────────────────────────────────────────────
 log "Writing /etc/wsl.conf..."
@@ -69,4 +64,4 @@ appendWindowsPath = ${WSL_INTEROP_APPENDWINDOWSPATH:-false}
 systemd = false
 WSLEOF
 
-log "APT and system configuration complete"
+log "DNF and system configuration complete"

@@ -1,6 +1,6 @@
 # Customizations Guide
 
-This directory contains everything needed to customize the WSL Ubuntu image
+This directory contains everything needed to customize the WSL Rocky Linux image
 beyond the baseline STIG/SCAP hardening. The structure is intentionally
 self-documenting — each file's purpose is clear from its location and name.
 
@@ -16,7 +16,7 @@ customizations/
 │       └── profile.d/
 │           └── 99-org-env.sh       ← Shell environment for all users
 └── scripts/            ← Numbered hook scripts run in order
-    ├── 00-configure-apt.sh         ← APT, timezone, locale, WSL config
+    ├── 00-configure-dnf.sh         ← DNF, timezone, locale, WSL config
     └── 01-configure-users.sh       ← Default user, sudo, MOTD
 ```
 
@@ -24,7 +24,7 @@ customizations/
 
 ### 1. Add packages — `packages.list`
 
-Add one apt package name per line. Lines starting with `#` are comments.
+Add one dnf package name per line. Lines starting with `#` are comments.
 
 ```
 # My org's packages
@@ -46,8 +46,8 @@ files/usr/local/share/ca-certificates/myorg-root-ca.crt
 # Add a custom bashrc
 files/etc/skel/.bashrc
 
-# Add an APT source list
-files/etc/apt/sources.list.d/myorg.list
+# Add a DNF repository definition
+files/etc/yum.repos.d/myorg.repo
 ```
 
 ### 3. Add hook scripts — `scripts/`
@@ -59,7 +59,7 @@ Use the numbering convention:
 
 | Range | Purpose |
 |-------|---------|
-| `00-09` | System/APT configuration |
+| `00-09` | System/DNF configuration |
 | `10-49` | Package-related setup |
 | `50-79` | User and identity configuration |
 | `80-99` | Final configuration and cleanup |
@@ -69,10 +69,9 @@ Use the numbering convention:
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-export DEBIAN_FRONTEND=noninteractive
 
 # Install org VPN
-apt-get install -y openvpn
+dnf install -y openvpn
 cp /opt/customizations/files/etc/openvpn/client.conf /etc/openvpn/
 ```
 
@@ -95,7 +94,7 @@ DEFAULT_USERNAME="acmeuser"
 |------|------|-------|
 | Build time | Package install, file copy, hook scripts | `packages.list`, `files/`, `scripts/` |
 | Build time | STIG/SCAP hardening | `../scripts/harden.sh` |
-| WSL import | `/etc/wsl.conf` applied by Windows | Written by `00-configure-apt.sh` |
+| WSL import | `/etc/wsl.conf` applied by Windows | Written by `00-configure-dnf.sh` |
 | First launch | `systemd` units, if enabled | `/etc/systemd/system/` |
 
 ## Secrets and Credentials
@@ -106,17 +105,3 @@ They will be baked into the image and visible to anyone who imports it.
 For secrets:
 - Use GitHub Actions secrets in `.github/workflows/build.yml`
 - Configure secrets at runtime via WSL environment variables or a vault client
-
-## Ubuntu Pro
-
-If your organization has an Ubuntu Pro subscription, set the secret
-`UBUNTU_PRO_TOKEN` in the repository and set `enable_ubuntu_pro: true` in
-the workflow dispatch input (or change the default in the workflow file).
-
-Ubuntu Pro provides:
-- **ESM Infra** — Extended Security Maintenance for Ubuntu LTS packages
-- **ESM Apps** — Extended Security Maintenance for popular open-source packages
-- **FIPS** — FIPS 140-2/140-3 certified cryptographic modules (requires additional enablement)
-- **CIS Hardening** — Canonical-supported CIS benchmark tooling
-
-See [ubuntu.com/pro](https://ubuntu.com/pro) for details.

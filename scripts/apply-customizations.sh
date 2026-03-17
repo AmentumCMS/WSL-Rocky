@@ -12,12 +12,11 @@
 # (mounted from the repo's customizations/ directory by the build script).
 #
 # Environment variables:
-#   UBUNTU_VERSION  — e.g. "22.04" (default: 22.04)
+#   ROCKY_VERSION  — e.g. "9" (default: 9)
 # =============================================================================
 set -euo pipefail
 
-export DEBIAN_FRONTEND=noninteractive
-UBUNTU_VERSION="${UBUNTU_VERSION:-22.04}"
+ROCKY_VERSION="${ROCKY_VERSION:-9}"
 CUSTOM_DIR="/opt/customizations"
 
 log()  { echo "[customize] $*"; }
@@ -42,12 +41,12 @@ if [ -f "${PACKAGES_FILE}" ]; then
   PACKAGES=$(grep -v '^\s*#' "${PACKAGES_FILE}" | grep -v '^\s*$' | tr '\n' ' ' || true)
 
   if [ -n "${PACKAGES}" ]; then
-    log "Updating apt package index..."
-    apt-get update -q
+    log "Updating dnf package cache..."
+    dnf makecache -q
 
     log "Installing packages: ${PACKAGES}"
     # shellcheck disable=SC2086
-    apt-get install -y --no-install-recommends ${PACKAGES}
+    dnf install -y ${PACKAGES}
     log "Package installation complete"
   else
     log "Package list is empty; skipping package installation"
@@ -93,7 +92,7 @@ else
 fi
 
 # ─── 5. Final cleanup ─────────────────────────────────────────────────────────
-apt-get clean
-rm -rf /var/lib/apt/lists/*
+dnf clean all
+rm -rf /var/cache/dnf/*
 
 log "Customization complete"
