@@ -64,7 +64,8 @@ docker exec "${CONTAINER_NAME}" bash -c "
   set -euo pipefail
   # --allowerasing allows dnf to replace curl-minimal (shipped in the base
   # image) with the full curl package, which would otherwise conflict.
-  # glibc-common provides /usr/share/i18n/charmaps/ required by localedef.
+  # glibc-common is included for completeness; glibc-langpack-en ships the
+  # pre-compiled locale data used below.
   dnf install -y --allowerasing \
     ca-certificates \
     curl \
@@ -74,7 +75,10 @@ docker exec "${CONTAINER_NAME}" bash -c "
     glibc-langpack-en \
     sudo \
     which
-  localedef -i en_US -f UTF-8 en_US.UTF-8
+  # glibc-langpack-en already ships pre-compiled locale data; writing
+  # /etc/locale.conf is sufficient — no need to run localedef, which
+  # requires charmap files that are stripped from the minimal container image.
+  echo 'LANG=en_US.UTF-8' > /etc/locale.conf
 "
 
 # ─── 4. Copy scripts and customizations into container ────────────────────────
