@@ -41,6 +41,15 @@ if [ -f "${PACKAGES_FILE}" ]; then
   PACKAGES=$(grep -v '^\s*#' "${PACKAGES_FILE}" | grep -v '^\s*$' | tr '\n' ' ' || true)
 
   if [ -n "${PACKAGES}" ]; then
+    # Enable EPEL and CRB so packages like htop, screen, fail2ban, and
+    # rkhunter (which are not shipped in the standard Rocky 9 repos) are
+    # available.  CRB (CodeReady Linux Builder) satisfies several EPEL
+    # build-dependencies and is a no-op when nothing in the package list
+    # requires it.
+    log "Enabling EPEL and CRB repositories..."
+    dnf install -y epel-release
+    dnf config-manager --enable crb
+
     log "Updating dnf package cache..."
     dnf makecache -q
 

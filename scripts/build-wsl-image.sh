@@ -75,9 +75,12 @@ docker exec "${CONTAINER_NAME}" bash -c "
     glibc-langpack-en \
     sudo \
     which
-  # glibc-langpack-en already ships pre-compiled locale data; writing
-  # /etc/locale.conf is sufficient — no need to run localedef, which
-  # requires charmap files that are stripped from the minimal container image.
+  # glibc-langpack-en already ships pre-compiled locale archive data; writing
+  # /etc/locale.conf is sufficient — no need to run localedef, which requires
+  # charmap files that are stripped from the minimal container image
+  # (tsflags=nodocs).  This avoids adding charmap files just to compile them
+  # away again, keeping the image footprint minimal consistent with hardening
+  # goals.
   echo 'LANG=en_US.UTF-8' > /etc/locale.conf
 "
 
