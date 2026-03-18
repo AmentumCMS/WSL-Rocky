@@ -12,7 +12,7 @@
 #      inside a container (SSH, PAM, auditd, sysctl defaults, etc.)
 #
 # Environment variables:
-#   UBUNTU_VERSION  — e.g. "22.04" (default: 22.04)
+#   ROCKY_VERSION   — e.g. "9" (default: 9)
 #   STIG_PROFILE    — SCAP profile ID (default: stig profile)
 #
 # NOTE: Some STIG controls are not remediable inside a container at build time:
@@ -24,9 +24,7 @@
 # =============================================================================
 set -uo pipefail  # Note: -e intentionally omitted; oscap returns non-zero for findings
 
-export DEBIAN_FRONTEND=noninteractive
-
-UBUNTU_VERSION="${UBUNTU_VERSION:-22.04}"
+ROCKY_VERSION="${ROCKY_VERSION:-9}"
 STIG_PROFILE="${STIG_PROFILE:-xccdf_org.ssgproject.content_profile_stig}"
 SCAP_RESULTS_DIR="/opt/scap-results"
 
@@ -37,33 +35,32 @@ warn() { echo "[harden] WARNING: $*" >&2; }
 
 # ─── 1. Install OpenSCAP and SCAP Security Guide ──────────────────────────────
 log "Installing OpenSCAP and SCAP Security Guide..."
-apt-get update -q
-apt-get install -y --no-install-recommends \
+dnf install -y \
   openscap-scanner \
-  ssg-debianoids \
-  python3-libopenscap8 \
+  scap-security-guide \
   bzip2 \
   unzip
 
 # ─── 2. Locate the correct SSG benchmark file ─────────────────────────────────
+# Use the RHEL 9 content which is applicable to Rocky Linux 9.
 # Try the packaged content first; fall back to downloading from upstream.
 SSG_CONTENT=""
 
-case "${UBUNTU_VERSION}" in
-  22.04)
-    PACKAGED_CONTENT="/usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml"
-    SSG_FILE_PATTERN="ssg-ubuntu2204-ds*.xml"
-    UPSTREAM_FILENAME="ssg-ubuntu2204-ds.xml"
+case "${ROCKY_VERSION}" in
+  9)
+    PACKAGED_CONTENT="/usr/share/xml/scap/ssg/content/ssg-rhel9-ds.xml"
+    SSG_FILE_PATTERN="ssg-rhel9-ds*.xml"
+    UPSTREAM_FILENAME="ssg-rhel9-ds.xml"
     ;;
-  24.04)
-    PACKAGED_CONTENT="/usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml"
-    SSG_FILE_PATTERN="ssg-ubuntu2404-ds*.xml"
-    UPSTREAM_FILENAME="ssg-ubuntu2404-ds.xml"
+  8)
+    PACKAGED_CONTENT="/usr/share/xml/scap/ssg/content/ssg-rhel8-ds.xml"
+    SSG_FILE_PATTERN="ssg-rhel8-ds*.xml"
+    UPSTREAM_FILENAME="ssg-rhel8-ds.xml"
     ;;
   *)
-    warn "No SSG content mapping for Ubuntu ${UBUNTU_VERSION}; attempting generic search"
+    warn "No SSG content mapping for Rocky Linux ${ROCKY_VERSION}; attempting generic search"
     PACKAGED_CONTENT="/dev/null"
-    SSG_FILE_PATTERN="ssg-ubuntu*.xml"
+    SSG_FILE_PATTERN="ssg-rhel*.xml"
     UPSTREAM_FILENAME=""
     ;;
 esac
@@ -102,7 +99,7 @@ oscap info "${SSG_CONTENT}" 2>&1 | grep -E "^\s+Profile:" || true
 # Verify the requested profile exists; fall back to CIS Level 2 if STIG not available
 if ! oscap info "${SSG_CONTENT}" 2>&1 | grep -q "${STIG_PROFILE}"; then
   warn "Profile '${STIG_PROFILE}' not found in SSG content."
-  FALLBACK="xccdf_org.ssgproject.content_profile_cis_level2_server"
+  FALLBACK="xccdf_org.ssgproject.content_profile_cis_server_l2"
   if oscap info "${SSG_CONTENT}" 2>&1 | grep -q "${FALLBACK}"; then
     warn "Falling back to CIS Level 2 Server profile: ${FALLBACK}"
     STIG_PROFILE="${FALLBACK}"
@@ -181,12 +178,8 @@ SSHEOF
 fi
 
 # --- PAM password policy ---
-if [ -f /etc/pam.d/common-password ]; then
-  # Install password quality library if not present
-  apt-get install -y --no-install-recommends libpam-pwquality 2>/dev/null || true
-
-  # Set strong password requirements
-  cat > /etc/security/pwquality.conf << 'PWEOF'
+# On RHEL/Rocky Linux, pwquality.conf is used directly (libpwquality is installed by default)
+cat > /etc/security/pwquality.conf << 'PWEOF'
 # STIG password quality requirements
 minlen = 15
 minclass = 4
@@ -199,14 +192,11 @@ ocredit = -1
 difok = 8
 gecoscheck = 1
 PWEOF
-  log "PAM password policy hardened"
-fi
+log "PAM password policy hardened"
 
 # --- Account lockout policy ---
-if [ -f /etc/pam.d/common-auth ]; then
-  apt-get install -y --no-install-recommends libpam-faillock 2>/dev/null || true
-  # Configure faillock
-  cat > /etc/security/faillock.conf << 'FLEOF'
+# On RHEL/Rocky Linux 9, faillock is configured via faillock.conf
+cat > /etc/security/faillock.conf << 'FLEOF'
 # STIG account lockout policy
 deny = 3
 fail_interval = 900
@@ -214,11 +204,10 @@ unlock_time = 900
 silent
 audit
 FLEOF
-  log "Account lockout policy configured"
-fi
+log "Account lockout policy configured"
 
 # --- auditd rules ---
-if apt-get install -y --no-install-recommends auditd audispd-plugins 2>/dev/null; then
+if dnf install -y audit 2>/dev/null; then
   mkdir -p /etc/audit/rules.d
   cat > /etc/audit/rules.d/99-stig.rules << 'AUDITEOF'
 ## STIG Audit Rules

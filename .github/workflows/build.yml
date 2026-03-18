@@ -1,7 +1,7 @@
-name: Build WSL Ubuntu Image
+name: Build WSL Rocky Linux Image
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Builds a hardened, STIG-compliant Ubuntu WSL2 rootfs tarball and Docker image.
+# Builds a hardened, STIG-compliant Rocky Linux WSL2 rootfs tarball and Docker image.
 #
 # Pipeline stages (main branch / tag push):
 #   build   → version   → release
@@ -21,7 +21,7 @@ name: Build WSL Ubuntu Image
 # On pull-requests only the build stage runs (no push, no release, no tag).
 #
 # Artifacts produced each run:
-#   • wsl-ubuntu-<version>-<build>.tar.gz  — WSL-importable rootfs
+#   • wsl-rocky-<version>-<build>.tar.gz   — WSL-importable rootfs
 #   • SHA256SUMS / SHA512SUMS              — integrity checksums
 #   • scap-results/                         — OpenSCAP pre/post HTML + XML
 #   • scan-results/clamav-results.txt       — ClamAV antivirus report
@@ -32,7 +32,6 @@ name: Build WSL Ubuntu Image
 #
 # Required secrets (set in repo Settings → Secrets):
 #   GITHUB_TOKEN      — automatically provided by Actions (GHCR push + releases)
-#   UBUNTU_PRO_TOKEN  — (optional) Ubuntu Pro attach token for ESM / FIPS
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -45,27 +44,19 @@ on:
     - cron: "0 2 * * 1" # Every Monday at 02:00 UTC
   workflow_dispatch:
     inputs:
-      ubuntu_version:
-        description: "Ubuntu version to build"
-        default: "22.04"
+      rocky_version:
+        description: "Rocky Linux version to build"
+        default: "9"
         required: false
         type: choice
         options:
-          - "22.04"
-          - "24.04"
+          - "9"
+          - "8"
       stig_profile:
         description: "SCAP/STIG profile ID (leave blank for default STIG)"
         default: "xccdf_org.ssgproject.content_profile_stig"
         required: false
         type: string
-      enable_ubuntu_pro:
-        description: "Attach Ubuntu Pro (requires UBUNTU_PRO_TOKEN secret)"
-        default: "false"
-        required: false
-        type: choice
-        options:
-          - "false"
-          - "true"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -73,9 +64,9 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/wsl-ubuntu
+  IMAGE_NAME: ${{ github.repository_owner }}/wsl-rocky
   # Resolve inputs with fallback defaults for non-dispatch triggers
-  UBUNTU_VERSION: ${{ inputs.ubuntu_version || '22.04' }}
+  ROCKY_VERSION: ${{ inputs.rocky_version || '9' }}
   STIG_PROFILE: ${{ inputs.stig_profile || 'xccdf_org.ssgproject.content_profile_stig' }}
   # Pinned tool versions — update here to bump across the entire workflow
   SYFT_VERSION: "1.18.1"
@@ -118,7 +109,7 @@ jobs:
             VERSION="${DATE}-${SHORT_SHA}"
           fi
 
-          ARTIFACT_BASE="wsl-ubuntu-${UBUNTU_VERSION}-${VERSION}"
+          ARTIFACT_BASE="wsl-rocky-${ROCKY_VERSION}-${VERSION}"
           {
             echo "version=${VERSION}"
             echo "artifact_base=${ARTIFACT_BASE}"
@@ -168,8 +159,6 @@ jobs:
         id: build
         env:
           ARTIFACT_BASE: ${{ steps.meta.outputs.artifact_base }}
-          ENABLE_UBUNTU_PRO: ${{ inputs.enable_ubuntu_pro || 'false' }}
-          UBUNTU_PRO_TOKEN: ${{ secrets.UBUNTU_PRO_TOKEN || '' }}
         run: |
           chmod +x scripts/*.sh
           bash scripts/build-wsl-image.sh
@@ -309,7 +298,7 @@ jobs:
           SHORT_SHA="${GITHUB_SHA::8}"
           STAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${SHORT_SHA}"
 
-          docker tag wsl-ubuntu:local "${STAGE_TAG}"
+          docker tag wsl-rocky:local "${STAGE_TAG}"
           docker push "${STAGE_TAG}"
 
           echo "image_ref=${STAGE_TAG}" >> "$GITHUB_OUTPUT"
@@ -395,7 +384,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git tag -a "${NEW_TAG}" \
-            -m "Automated release ${NEW_TAG} — Ubuntu ${UBUNTU_VERSION} build ${{ needs.build.outputs.version }}"
+            -m "Automated release ${NEW_TAG} — Rocky Linux ${ROCKY_VERSION} build ${{ needs.build.outputs.version }}"
           git push origin "${NEW_TAG}"
 
           {
@@ -427,16 +416,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.version.outputs.tag }}
-          # Ternary: tag push → "Release v1.2.3", main push → "WSL Ubuntu v1.2.3 — Build <date-sha>"
+          # Ternary: tag push → "Release v1.2.3", main push → "WSL Rocky Linux v1.2.3 — Build <date-sha>"
           name: >-
             ${{ startsWith(github.ref, 'refs/tags/')
               && format('Release {0}', needs.version.outputs.tag)
-              || format('WSL Ubuntu {0} — Build {1}', needs.version.outputs.tag, needs.build.outputs.version) }}
+              || format('WSL Rocky Linux {0} — Build {1}', needs.version.outputs.tag, needs.build.outputs.version) }}
           prerelease: false
           generate_release_notes: true
           fail_on_unmatched_files: false
           body: |
-            ## WSL Ubuntu ${{ env.UBUNTU_VERSION }} — ${{ needs.version.outputs.tag }}
+            ## WSL Rocky Linux ${{ env.ROCKY_VERSION }} — ${{ needs.version.outputs.tag }}
 
             > Build ref: `${{ needs.build.outputs.version }}`
 
@@ -448,8 +437,8 @@ jobs:
             (Get-FileHash "${{ needs.build.outputs.artifact_base }}.tar.gz" -Algorithm SHA256).Hash
 
             # Import
-            wsl --import Ubuntu-Hardened C:\WSL\Ubuntu-Hardened "${{ needs.build.outputs.artifact_base }}.tar.gz" --version 2
-            wsl -d Ubuntu-Hardened
+            wsl --import Rocky-Hardened C:\WSL\Rocky-Hardened "${{ needs.build.outputs.artifact_base }}.tar.gz" --version 2
+            wsl -d Rocky-Hardened
             ```
 
             ### Pull from GHCR (Docker / Linux)
@@ -462,7 +451,7 @@ jobs:
 
             | File | Description |
             |------|-------------|
-            | `*.tar.gz` | WSL2-importable Ubuntu rootfs |
+            | `*.tar.gz` | WSL2-importable Rocky Linux rootfs |
             | `SHA256SUMS` / `SHA512SUMS` | Integrity checksums |
             | `post-remediation-report.html` | OpenSCAP/STIG compliance report |
             | `clamav-results.txt` | ClamAV antivirus scan |
@@ -520,7 +509,7 @@ jobs:
       - name: Pull staged Docker image
         run: |
           docker pull "${{ needs.build.outputs.image_ref }}"
-          docker tag  "${{ needs.build.outputs.image_ref }}" wsl-ubuntu:local
+          docker tag  "${{ needs.build.outputs.image_ref }}" wsl-rocky:local
           echo "Pulled staged image: ${{ needs.build.outputs.image_ref }}"
 
       - name: Tag and push versioned image to GHCR
@@ -531,11 +520,11 @@ jobs:
           VERSIONED="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${NEW_TAG}"
           LATEST="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
 
-          docker tag wsl-ubuntu:local "${VERSIONED}"
+          docker tag wsl-rocky:local "${VERSIONED}"
           docker push "${VERSIONED}"
           echo "Pushed ${VERSIONED}"
 
-          docker tag wsl-ubuntu:local "${LATEST}"
+          docker tag wsl-rocky:local "${LATEST}"
           docker push "${LATEST}"
           echo "Pushed ${LATEST}"
 
