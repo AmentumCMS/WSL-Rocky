@@ -34,7 +34,7 @@ net-tools
 bind-utils
 nmap
 traceroute
-ncat
+nmap-ncat
 iproute
 openssh-clients
 
