@@ -62,11 +62,15 @@ log "Container ${CONTAINER_NAME} is running"
 log "Bootstrapping package manager..."
 docker exec "${CONTAINER_NAME}" bash -c "
   set -euo pipefail
+  # --allowerasing allows dnf to replace curl-minimal (shipped in the base
+  # image) with the full curl package, which would otherwise conflict.
+  # glibc-common provides /usr/share/i18n/charmaps/ required by localedef.
   dnf install -y --allowerasing \
     ca-certificates \
     curl \
     wget \
     gnupg2 \
+    glibc-common \
     glibc-langpack-en \
     sudo \
     which
