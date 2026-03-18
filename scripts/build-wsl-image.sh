@@ -62,7 +62,7 @@ log "Container ${CONTAINER_NAME} is running"
 log "Bootstrapping package manager..."
 docker exec "${CONTAINER_NAME}" bash -c "
   set -euo pipefail
-  dnf install -y \
+  dnf install -y --allowerasing \
     ca-certificates \
     curl \
     wget \
